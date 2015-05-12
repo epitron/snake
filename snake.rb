@@ -16,6 +16,11 @@ def move_to(pos)
   print "\e[#{pos.y+1};#{pos.x+1}H"
 end
 
+def show(str, pos, *colors)
+  move_to(pos)
+  print Paint[str, *colors]
+end
+
 def hide_cursor
   print "\e[?25l"
 end
@@ -25,7 +30,7 @@ def show_cursor
 end
 
 def rainbow(i)
-  freq   = 1.0
+  freq   = 0.5
   # spread = 3.0
   # i      = i / spread
   red    = Math.sin(freq*i + 0) * 127 + 128
@@ -109,7 +114,7 @@ class Snake < Array
 
   %i[up down left right].each do |dir|
     define_method("#{dir}!") do
-      if body.empty? or dir != OPPOSITE_DIRECTION[direction]
+      if body.empty? or (head + DIRECTION_VECTOR[dir]) != body.first
         @direction = dir
       end
     end
@@ -160,31 +165,31 @@ end
 class Food < Struct.new(:icon, :color)
   FOOD_ICONS = {
     "🍄"=>"white",
-    "🍅"=>"red",
-    "🍆"=>"violet",
-    "🍇"=>"purple",
+    "🍅"=>"orange red",
+    "🍆"=>"#6600FF",
+    "🍇"=>"#944DFF",
     "🍈"=>"yellow",
     "🍉"=>"red",
     "🍊"=>"orange",
     "🍋"=>"yellow",
     "🍌"=>"yellow",
     "🍍"=>"yellow",
-    "🍎"=>"light red",
-    "🍰"=>"tan",
+    "🍎"=>"red",
+    "🍰"=>"#FFFF99",
     "🍐"=>"lime green",
-    "🍑"=>"orange",
+    "🍑"=>"#FFCC99",
     "🍒"=>"red",
     "🍓"=>"hot pink",
-    "🍔"=>"yellow",
+    "🍔"=>"#FFCC00",
     "🍕"=>"orange",
     "🍖"=>"cyan",
-    "🍗"=>"brown",
+    "🍗"=>"#FFB870",
     "🍘"=>"white",
     "🍙"=>"white",
     "🍚"=>"white",
     "🍛"=>"red",
     "🍜"=>"white",
-    "🍞"=>"yellow",
+    "🍞"=>"sandy brown",
     "🍩"=>"pink",
     "🍪"=>"rosy brown",
     "🍫"=>"brown",
@@ -192,11 +197,9 @@ class Food < Struct.new(:icon, :color)
     "🍡"=>"light salmon",
     "🍢"=>"khaki",
     "🍣"=>"lemon chiffon",
-    "🍤"=>"sea shell",
-    "🍭"=>"light cyan"
+    "🍤"=>"#FF9966",
+    "🍭"=>"magenta",
   }
-# 🍩 pink 🍪 beige 🍫 brown 🍟 yellow 🍡 light salmon 🍢 khaki 🍣 🍤 sea shell 🍭 light cyan
-#  🍠 🍥 🍦 🍧 🍨  🍬 🍭 🍮 🍯
 
   FOODS = FOOD_ICONS.map do |icon, color|
     Food.new(icon, color.to_s)
@@ -238,10 +241,6 @@ class Board
     reset!
   end
 
-  def random_pos
-    Pos.new rand(size.x), rand(size.y)
-  end
-
   def reset!
     @snake = Snake.new(self, :up)
     @dead_counter = nil
@@ -251,18 +250,14 @@ class Board
     @amount_of_food.times do
       pos = random_pos
       redo if foods[pos]
-
       foods[pos] = Food.random
     end
   end    
 
-  def center
-    @size/2
-  end
+  def center; size/2; end
 
-  def show(str, pos, *colors)
-    move_to(pos)
-    print Paint[str, *colors]
+  def random_pos
+    Pos.new rand(size.x), rand(size.y)
   end
 
   def draw
@@ -290,7 +285,9 @@ class Board
   end
 
   def update
-    if snake.ate_itself?
+    if foods.empty?
+      win! 
+    elsif snake.ate_itself?
       @dead_counter ||= 10
       @dead_counter -= 1
       if @dead_counter < 0
@@ -301,14 +298,27 @@ class Board
 
       if foods[snake.head]
         foods.delete(snake.head)
-        snake.grow!
+        snake.grow!(2)
       end
     end
   end
 
+  def win!
+    200.times do |n|
+      snake.body.each.with_index do |pos, i|
+        show('◉', pos, rainbow(i+n))
+      end
+
+      show(snake.head_icon, snake.head, rainbow(n))
+
+      sleep 0.01
+    end
+    reset!
+  end
+
 end
 
-board = Board.new(50)
+board = Board.new(1)
 
 keymap = KeyMap.new do
   key(:up)      { board.snake.up!    }
