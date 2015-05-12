@@ -18,7 +18,7 @@ def move_to(pos)
 end
 
 def show(str, pos, *colors)
-  move_to(pos)
+  move_to(Pos.new(pos.x*2, pos.y))
   print Paint[str, *colors]
 end
 
@@ -189,7 +189,6 @@ class Food < Struct.new(:icon, :color)
     "🍘"=>"white",
     "🍙"=>"white",
     "🍚"=>"white",
-    "🍛"=>"red",
     "🍜"=>"white",
     "🍞"=>"sandy brown",
     "🍩"=>"pink",
@@ -235,9 +234,9 @@ end
 
 class Board
 
-  attr_reader :size, :snake, :foods
+  attr_reader :size, :snake, :foods, :level, :lives, :initial_food
 
-  def initialize(initial_food=20, width=40, height=20)
+  def initialize(initial_food=20, width=20, height=20)
     @size         = Pos.new(width, height)
     @initial_food = initial_food
 
@@ -252,7 +251,12 @@ class Board
   end
 
   def restart!
+    @lives = 3
     @level = 1
+    reset!
+  end
+
+  def retry!
     reset!
   end
 
@@ -263,8 +267,11 @@ class Board
 
   def grow_food!
     @foods = {}
+    amount = (initial_food * (1.5**(level-1))).to_i
 
-    (@initial_food * (2**@level)).times do
+    amount = size.x * size.y if amount > size.x * size.y
+
+    amount.times do
       pos = random_pos
       redo if foods[pos]
       foods[pos] = Food.random
@@ -272,11 +279,50 @@ class Board
   end    
 
 
+  def win!
+    200.times do |n|
+      snake.body.each.with_index do |pos, i|
+        show('◉', pos, rainbow(i+n))
+      end
+
+      color = rainbow(n)
+
+      show(snake.head_icon, snake.head, color)
+
+      status_message("========== YOU WIN!!! ============", color)
+
+      sleep 0.01
+    end
+    next_level!
+  end
+
+  def die!
+    @dead_counter ||= 10
+    @dead_counter -= 1
+
+    if @dead_counter < 0
+      if lives > 0
+        @lives -= 1
+        retry!
+      else
+        10.times do |n|
+          status_message("------------ GAME OVER! ----------------", :bright, [:red, :green][n%2])
+          sleep 0.3
+        end
+        restart!
+      end
+    end
+  end
 
   def center; size/2; end
 
   def random_pos
     Pos.new rand(size.x), rand(size.y)
+  end
+
+  def status_message(msg, *colors)
+    move_to(Pos.new(0,size.y+1))
+    print Paint[msg, *colors]
   end
 
   def draw
@@ -291,23 +337,27 @@ class Board
         color = :red
       end
 
-      # ◍ ◎
-      show('◉', pos, color)
+      show('◉', pos, color) # ◍ ◎ ◉
     end
 
-    # show("👾", snake.head, :bright, :green)
     if snake.alive?
       show(snake.head_icon, snake.head, :bright, :green)
     else
       show(snake.head_icon, snake.head, :bright, :red)
     end
+
+    status_message(
+      Paint['👾 ' * lives, :cyan] + 
+      Paint["  Level #{level}  ", :green] + 
+      Paint["(#{foods.size} foods remaining)", :bright, :red]
+    )
   end
 
   def update
     if foods.empty?
       win!
     elsif snake.ate_itself?
-      dead!
+      die!
     else
       snake.move!
 
@@ -318,26 +368,6 @@ class Board
     end
   end
 
-  def dead!
-    @dead_counter ||= 10
-    @dead_counter -= 1
-    if @dead_counter < 0
-      restart!
-    end
-  end
-
-  def win!
-    200.times do |n|
-      snake.body.each.with_index do |pos, i|
-        show('◉', pos, rainbow(i+n))
-      end
-
-      show(snake.head_icon, snake.head, rainbow(n))
-
-      sleep 0.01
-    end
-    next_level!
-  end
 
 end
 
@@ -369,7 +399,7 @@ Thread.new do
       board.update
     end
   rescue => e
-   p e
+   p e, e.backtrace
    exit 1
  end
 end
