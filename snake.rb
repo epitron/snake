@@ -2,6 +2,7 @@ require 'io/console'
 require 'paint'
 require_relative 'keymap'
 
+##################################################################################
 # http://en.wikipedia.org/wiki/Emoji#In_the_Unicode_standard
 
 def clear
@@ -39,7 +40,7 @@ def rainbow(i)
   "#%02X%02X%02X" % [ red, green, blue ]
 end
 
-
+##################################################################################
 
 class Pos
   attr_accessor :x, :y
@@ -69,7 +70,7 @@ class Pos
   def hash; [x, y].hash; end
 end
 
-
+##################################################################################
 
 class Snake < Array
 
@@ -161,6 +162,7 @@ class Snake < Array
 
 end
 
+##################################################################################
 
 class Food < Struct.new(:icon, :color)
   FOOD_ICONS = {
@@ -229,30 +231,47 @@ end
 
 # end
 
+##################################################################################
 
 class Board
 
   attr_reader :size, :snake, :foods
 
-  def initialize(amount_of_food=20, width=40, height=20)
-    @size           = Pos.new(width, height)
-    @amount_of_food = amount_of_food
+  def initialize(initial_food=20, width=40, height=20)
+    @size         = Pos.new(width, height)
+    @initial_food = initial_food
 
-    reset!
+    restart!
   end
 
   def reset!
     @snake = Snake.new(self, :up)
     @dead_counter = nil
 
+    grow_food!
+  end
+
+  def restart!
+    @level = 1
+    reset!
+  end
+
+  def next_level!
+    @level += 1
+    reset!
+  end    
+
+  def grow_food!
     @foods = {}
 
-    @amount_of_food.times do
+    (@initial_food * (2**@level)).times do
       pos = random_pos
       redo if foods[pos]
       foods[pos] = Food.random
     end
   end    
+
+
 
   def center; size/2; end
 
@@ -286,13 +305,9 @@ class Board
 
   def update
     if foods.empty?
-      win! 
+      win!
     elsif snake.ate_itself?
-      @dead_counter ||= 10
-      @dead_counter -= 1
-      if @dead_counter < 0
-        reset!
-      end
+      dead!
     else
       snake.move!
 
@@ -300,6 +315,14 @@ class Board
         foods.delete(snake.head)
         snake.grow!(2)
       end
+    end
+  end
+
+  def dead!
+    @dead_counter ||= 10
+    @dead_counter -= 1
+    if @dead_counter < 0
+      restart!
     end
   end
 
@@ -313,23 +336,29 @@ class Board
 
       sleep 0.01
     end
-    reset!
+    next_level!
   end
 
 end
 
-board = Board.new(1)
+##################################################################################
+
+board = Board.new
 
 keymap = KeyMap.new do
   key(:up)      { board.snake.up!    }
   key(:down)    { board.snake.down!  }
   key(:left)    { board.snake.left!  }
   key(:right)   { board.snake.right! }
-  key("g")   { board.snake.grow!(20) }
-  key("n")   { board.reset! }
+
+  key("g")      { board.snake.grow!(20) }
+  key("r")      { board.restart! }
+  key("w")      { board.win! }
 
   key("q", "Q", "\C-c") { KeyMap.quit! }
 end
+
+##################################################################################
 
 Thread.new do
   begin
@@ -345,6 +374,7 @@ Thread.new do
  end
 end
 
+##################################################################################
 
 hide_cursor
 IO.console.raw { |io| keymap.process(io) }
