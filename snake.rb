@@ -4,6 +4,12 @@ require_relative 'keymap'
 
 ##################################################################################
 # http://en.wikipedia.org/wiki/Emoji#In_the_Unicode_standard
+#
+# TODOs:
+# - high performance rendering (only render differences)
+# - non-threaded event loop
+# - buffer up movement commands
+#
 
 def clear
   print "\e[H\e[2J"
